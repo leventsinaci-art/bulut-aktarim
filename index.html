@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bulut Aktarım</title>
+<meta name="description" content="Google Drive ile Dropbox arasında iki yönlü dosya ve klasör kopyalama.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231A73E8'/%3E%3Cpath fill='white' d='M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3 5 6.99h3V14h2V6.99h3L9 3z'/%3E%3C/svg%3E">
+<style>
+:root{
+  --brand:#1A73E8; --brand-dark:#0B57D0; --violet:#6C47FF; --ok:#1E8E3E; --warn:#F29900; --err:#D93025;
+  --bg:#F3F6FB; --card:#FFFFFF; --text:#1F2329; --muted:#5F6670; --line:#E3E7EE; --hover:#F1F5FD; --chip:#E8F0FE;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 4px 16px rgba(16,24,40,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#111418; --card:#1B1F25; --text:#E8EAED; --muted:#A0A7B1; --line:#2C323A; --hover:#232934; --chip:#22314D;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.3); }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;min-height:100vh}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+button:disabled{cursor:default;opacity:.5}
+.hdr{background:linear-gradient(135deg,#1A73E8 0%,#0061FE 50%,#6C47FF 100%);color:#fff;padding:28px 16px 64px;border-radius:0 0 32px 32px}
+.hdr-in{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:14px}
+.hdr .logo{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.18);display:grid;place-items:center;flex:none}
+.hdr h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.2px}
+.hdr p{margin:2px 0 0;opacity:.88;font-size:14px}
+main{max-width:760px;margin:-40px auto 40px;padding:0 16px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:18px}
+.card h2{margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600}
+.accounts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:560px){.accounts{grid-template-columns:1fr}}
+.acc{border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;align-items:center;gap:12px;min-width:0}
+.acc .ic{width:44px;height:44px;border-radius:50%;background:var(--hover);display:grid;place-items:center;flex:none}
+.acc .meta{flex:1;min-width:0}
+.acc .name{font-weight:600}
+.acc .sub{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acc .sub.ok{color:var(--ok)}
+.btn{border-radius:999px;padding:9px 16px;font-weight:600;background:var(--brand);color:#fff;white-space:nowrap}
+.btn:hover:not(:disabled){background:var(--brand-dark)}
+.btn.ghost{background:transparent;color:var(--brand);border:1px solid var(--line)}
+.btn.ghost:hover:not(:disabled){background:var(--hover)}
+.btn.big{width:100%;padding:15px;font-size:16px;border-radius:16px}
+.btn.danger{background:transparent;color:var(--err);border:1px solid var(--line)}
+.dir{display:flex;align-items:center;gap:12px}
+.side{flex:1;border-radius:16px;background:var(--hover);padding:14px;display:flex;align-items:center;gap:10px;min-width:0}
+.side small{display:block;color:var(--muted);font-size:12px}
+.side b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.swap{width:48px;height:48px;border-radius:50%;flex:none;display:grid;place-items:center;background:linear-gradient(135deg,#1A73E8,#6C47FF);box-shadow:0 4px 12px rgba(26,115,232,.35);transition:transform .25s}
+.swap:hover:not(:disabled){transform:rotate(180deg)}
+.pick{width:100%;display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;border:1px solid var(--line);text-align:left;margin-top:10px}
+.pick:hover:not(:disabled){background:var(--hover)}
+.pick .num{width:30px;height:30px;border-radius:50%;background:var(--chip);color:var(--brand);font-weight:700;display:grid;place-items:center;flex:none}
+.pick .num.done{background:var(--ok);color:#fff}
+.pick .t{flex:1;min-width:0}
+.pick .t b{display:block}
+.pick .t span{display:block;color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.note{font-size:13px;color:var(--muted);margin:10px 2px 0}
+.hidden{display:none!important}
+/* Progress */
+.prog{display:flex;gap:20px;align-items:center}
+@media (max-width:560px){.prog{flex-direction:column;align-items:stretch}.ring{align-self:center}}
+.ring{position:relative;width:132px;height:132px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring .pct{position:absolute;inset:0;display:grid;place-items:center;font-size:26px;font-weight:700}
+.stats{flex:1;min-width:0}
+.stats .phase{font-weight:600;font-size:17px}
+.stats .file{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:2px 0 10px}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#1A73E8,#6C47FF);transition:width .2s}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-top:12px;font-size:13px}
+.grid span{color:var(--muted)}
+.grid b{display:block;font-size:15px;color:var(--text)}
+.log{margin-top:14px;max-height:220px;overflow:auto;border-top:1px solid var(--line);padding-top:10px;font-size:13px}
+.log div{padding:3px 0;word-break:break-word}
+.log .e{color:var(--err)} .log .s{color:var(--warn)}
+.prog-actions{display:flex;gap:10px;margin-top:16px;justify-content:flex-end}
+/* Browser modal */
+.modal{position:fixed;inset:0;background:rgba(10,14,20,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+.sheet{background:var(--card);width:100%;max-width:720px;height:min(86vh,760px);border-radius:20px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.sheet-h{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.sheet-h b{flex:1;font-size:17px}
+.iconbtn{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;flex:none}
+.iconbtn:hover{background:var(--hover)}
+.crumbs{display:flex;gap:6px;padding:10px 16px;overflow-x:auto;border-bottom:1px solid var(--line);flex:none}
+.crumbs button{background:var(--chip);color:var(--brand);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600;white-space:nowrap}
+.crumbs button:last-child{background:var(--brand);color:#fff}
+.list{flex:1;overflow:auto}
+.row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none}
+.row:hover{background:var(--hover)}
+.row .fi{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:none}
+.row .nm{flex:1;min-width:0}
+.row .nm div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .nm small{color:var(--muted);font-size:12px}
+.cb{width:22px;height:22px;border-radius:6px;border:2px solid var(--muted);flex:none;display:grid;place-items:center}
+.row.sel .cb{background:var(--brand);border-color:var(--brand)}
+.row.sel{background:var(--chip)}
+.open{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;flex:none;color:var(--muted)}
+.open:hover{background:var(--line)}
+.empty,.loading{padding:40px 16px;text-align:center;color:var(--muted)}
+.sheet-f{padding:12px 16px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.sheet-f span{flex:1;color:var(--muted);font-size:13px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#202124;color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;z-index:20;max-width:calc(100% - 32px);box-shadow:0 6px 20px rgba(0,0,0,.3)}
+.spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:sp 1s linear infinite;margin:0 auto 10px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.reauth{background:#FEF7E0;color:#5F4200;border-radius:14px;padding:12px 14px;margin-top:12px;display:flex;gap:12px;align-items:center}
+.reauth span{flex:1}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:0 16px 30px}
+</style>
+</head>
+<body>
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="logo"><svg width="28" height="28" viewBox="0 0 24 24"><path fill="#fff" d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3 5 6.99h3V14h2V6.99h3L9 3z"/></svg></div>
+    <div><h1>Bulut Aktarım</h1><p>Google Drive ⇄ Dropbox dosya ve klasör kopyalama</p></div>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Hesaplar</h2>
+    <div class="accounts">
+      <div class="acc">
+        <div class="ic" data-icon="drive"></div>
+        <div class="meta"><div class="name">Google Drive</div><div class="sub" id="gSub">Bağlı değil</div></div>
+        <button class="btn" id="gBtn">Bağlan</button>
+      </div>
+      <div class="acc">
+        <div class="ic" data-icon="dropbox"></div>
+        <div class="meta"><div class="name">Dropbox</div><div class="sub" id="dSub">Bağlı değil</div></div>
+        <button class="btn" id="dBtn">Bağlan</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="setup">
+    <h2>Aktarım</h2>
+    <div class="dir">
+      <div class="side"><span id="srcIc"></span><div style="min-width:0"><small>Kaynak</small><b id="srcName"></b></div></div>
+      <button class="swap" id="swap" title="Yönü değiştir"><svg width="24" height="24" viewBox="0 0 24 24"><path fill="#fff" d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3 5 6.99h3V14h2V6.99h3L9 3z" transform="rotate(90 12 12)"/></svg></button>
+      <div class="side"><span id="dstIc"></span><div style="min-width:0"><small>Hedef</small><b id="dstName"></b></div></div>
+    </div>
+    <button class="pick" id="pickSrc">
+      <span class="num" id="n1">1</span>
+      <span class="t"><b>Kopyalanacakları seç</b><span id="srcSel">Henüz seçilmedi</span></span>
+      <span data-icon="chev"></span>
+    </button>
+    <button class="pick" id="pickDst">
+      <span class="num" id="n2">2</span>
+      <span class="t"><b>Hedef klasörü seç</b><span id="dstSel">Ana klasör</span></span>
+      <span data-icon="chev"></span>
+    </button>
+    <div style="margin-top:14px"><button class="btn big" id="start" disabled>Aktarımı başlat</button></div>
+    <p class="note" id="hint"></p>
+  </section>
+
+  <section class="card hidden" id="progress">
+    <h2 id="pTitle">Aktarım</h2>
+    <div class="prog">
+      <div class="ring">
+        <svg width="132" height="132" viewBox="0 0 132 132">
+          <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1A73E8"/><stop offset="1" stop-color="#6C47FF"/></linearGradient></defs>
+          <circle cx="66" cy="66" r="56" fill="none" stroke="var(--line)" stroke-width="12"/>
+          <circle id="ringArc" cx="66" cy="66" r="56" fill="none" stroke="url(#rg)" stroke-width="12" stroke-linecap="round" stroke-dasharray="351.86" stroke-dashoffset="351.86"/>
+        </svg>
+        <div class="pct" id="pct">0%</div>
+      </div>
+      <div class="stats">
+        <div class="phase" id="phase">Hazırlanıyor…</div>
+        <div class="file" id="curFile">&nbsp;</div>
+        <div class="bar"><i id="fileBar"></i></div>
+        <div class="grid">
+          <div><span>Dosyalar</span><b id="sFiles">0 / 0</b></div>
+          <div><span>Boyut</span><b id="sBytes">0 B / 0 B</b></div>
+          <div><span>Hız</span><b id="sSpeed">–</b></div>
+          <div><span>Kalan süre</span><b id="sEta">–</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="reauth hidden" id="reauth"><span>Google oturumunun süresi doldu. Aktarım devam etsin diye yeniden giriş yap.</span><button class="btn" id="reauthBtn">Google'a giriş yap</button></div>
+    <div class="log hidden" id="log"></div>
+    <div class="prog-actions">
+      <button class="btn danger" id="cancel">İptal et</button>
+      <button class="btn hidden" id="done">Yeni aktarım</button>
+    </div>
+  </section>
+  <p class="note" style="text-align:center">Dosyalar bilgisayarına kaydedilmez; parça parça doğrudan bir buluttan diğerine aktarılır. Aktarım sürerken bu sekmeyi açık tut.</p>
+</main>
+<footer>Bulut Aktarım · web sürümü</footer>
+
+<div class="modal hidden" id="modal">
+  <div class="sheet">
+    <div class="sheet-h">
+      <button class="iconbtn" id="mBack" title="Geri" data-icon="back"></button>
+      <b id="mTitle"></b>
+      <button class="iconbtn" id="mAll" title="Tümünü seç" data-icon="all"></button>
+      <button class="iconbtn" id="mClose" title="Kapat" data-icon="close"></button>
+    </div>
+    <div class="crumbs" id="crumbs"></div>
+    <div class="list" id="list"></div>
+    <div class="sheet-f"><span id="mInfo"></span><button class="btn" id="mOk"></button></div>
+  </div>
+</div>
+<div class="toast hidden" id="toast"></div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+"use strict";
+/* ===== Ayarlar ===== */
+const CONFIG = {
+  GOOGLE_CLIENT_ID: "550984675800-lqr6a67mtt2iok3isp7lpegj2ihhqd4e.apps.googleusercontent.com",
+  DROPBOX_APP_KEY: "aikb3hj0xglvpda",
+};
+const REDIRECT_URI = location.origin + location.pathname;
+const CHUNK = 8 * 1024 * 1024; // 8 MB (Drive için 256 KB'nin katı)
+const FOLDER_MIME = "application/vnd.google-apps.folder";
+const EXPORTS = {
+  "application/vnd.google-apps.document": ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx"],
+  "application/vnd.google-apps.spreadsheet": ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"],
+  "application/vnd.google-apps.presentation": ["application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx"],
+  "application/vnd.google-apps.drawing": ["image/png", ".png"],
+  "application/vnd.google-apps.script": ["application/vnd.google-apps.script+json", ".json"],
+};
+
+/* ===== İkonlar ===== */
+const ICONS = {
+  drive: '<svg width="24" height="24" viewBox="0 0 24 24"><path fill="#0F9D58" d="M8.1 3.5h7.8l-7.4 12.8L4.6 9.6z"/><path fill="#FFC107" d="m15.9 3.5 7 12.1h-7.8l-7-12.1z"/><path fill="#4285F4" d="m22.9 15.6-3.9 6.8H5.1L9 15.6z"/><path fill="#0B8043" d="m4.6 9.6 3.9 6.7-3.4 6.1-4-6.8z"/></svg>',
+  dropbox: '<svg width="24" height="24" viewBox="0 0 24 24"><path fill="#0061FE" d="m7 2.5 5 3.2-5 3.2-5-3.2zm10 0 5 3.2-5 3.2-5-3.2zM7 8.9l5 3.2-5 3.2-5-3.2zm10 0 5 3.2-5 3.2-5-3.2zM7 16.4l5-3.2 5 3.2-5 3.2z"/></svg>',
+  chev: '<svg width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M8.6 16.6 13.2 12 8.6 7.4 10 6l6 6-6 6z"/></svg>',
+  back: '<svg width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg>',
+  close: '<svg width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg>',
+  all: '<svg width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M3 5h2V3a2 2 0 0 0-2 2m0 8h2v-2H3zm4 8h2v-2H7zM3 9h2V7H3zm10-6h-2v2h2zm6 0v2h2a2 2 0 0 0-2-2M5 21v-2H3a2 2 0 0 0 2 2m-2-4h2v-2H3zM9 3H7v2h2zm2 18h2v-2h-2zm8-8h2v-2h-2zm0 8a2 2 0 0 0 2-2h-2zm0-12h2V7h-2zm0 8h2v-2h-2zm-4 4h2v-2h-2zm0-16h2V3h-2zM7 17h10V7H7zm2-8h6v6H9z"/></svg>',
+  check: '<svg width="16" height="16" viewBox="0 0 24 24"><path fill="#fff" d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>',
+  folder: '<svg width="22" height="22" viewBox="0 0 24 24"><path fill="#F4B400" d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8z"/></svg>',
+  file: '<svg width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm-1 7V3.5L18.5 9z"/></svg>',
+};
+const FILE_COLORS = [
+  [/\.(jpe?g|png|gif|webp|heic|bmp|svg)$/i, "#E8F5E9", "#1E8E3E"],
+  [/\.(mp4|mov|avi|mkv|webm|3gp)$/i, "#FCE8E6", "#D93025"],
+  [/\.(mp3|wav|m4a|flac|ogg|aac)$/i, "#F3E8FD", "#9334E6"],
+  [/\.(zip|rar|7z|tar|gz)$/i, "#FEF7E0", "#B06000"],
+  [/\.(pdf)$/i, "#FCE8E6", "#C5221F"],
+  [/\.(docx?|txt|rtf|odt|xlsx?|csv|pptx?)$/i, "#E8F0FE", "#1A73E8"],
+];
+document.querySelectorAll("[data-icon]").forEach(el => el.innerHTML = ICONS[el.dataset.icon]);
+
+/* ===== Yardımcılar ===== */
+const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+function fmtSize(b) {
+  if (!b) return "0 B";
+  if (b < 1024) return b + " B";
+  const u = ["KB", "MB", "GB", "TB"]; let v = b / 1024, i = 0;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return v.toLocaleString("tr-TR", { maximumFractionDigits: 1 }) + " " + u[i];
+}
+function fmtTime(s) {
+  if (!isFinite(s) || s < 0) return "–";
+  s = Math.round(s);
+  if (s < 60) return s + " sn";
+  if (s < 3600) return Math.floor(s / 60) + " dk " + (s % 60) + " sn";
+  return Math.floor(s / 3600) + " sa " + Math.floor((s % 3600) / 60) + " dk";
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+let toastTimer;
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.remove("hidden");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add("hidden"), 4500);
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+class SkipError extends Error {}
+class CancelError extends Error {}
+
+/* Geçici ağ hatalarında ve 429/5xx'te birkaç kez yeniden dener. */
+async function fetchRetry(url, opts, tries = 5) {
+  for (let i = 0; ; i++) {
+    if (job && job.cancelled) throw new CancelError("İptal edildi");
+    let r;
+    try { r = await fetch(url, opts); }
+    catch (e) { if (i >= tries - 1) throw new Error("Bağlantı hatası: " + e.message); await sleep(1000 * 2 ** i); continue; }
+    if ((r.status === 429 || r.status >= 500) && i < tries - 1) {
+      const ra = Number(r.headers.get("Retry-After")) || 0;
+      await sleep(Math.max(ra * 1000, 1000 * 2 ** i)); continue;
+    }
+    return r;
+  }
+}
+
+/* ===== Google oturumu ===== */
+const google_ = {
+  token: null, exp: 0, email: null, client: null, waiters: [],
+  init() {
+    const s = store.get("g_auth");
+    if (s && s.exp > Date.now() + 60000) Object.assign(this, { token: s.token, exp: s.exp, email: s.email });
+    else if (s) this.email = s.email;
+  },
+  configured() { return !CONFIG.GOOGLE_CLIENT_ID.includes("BURAYA"); },
+  valid() { return this.token && this.exp > Date.now() + 60000; },
+  ensureClient() {
+    if (this.client) return this.client;
+    if (!window.google || !google.accounts) throw new Error("Google giriş betiği yüklenemedi. Sayfayı yenile.");
+    this.client = google.accounts.oauth2.initTokenClient({
+      client_id: CONFIG.GOOGLE_CLIENT_ID,
+      scope: "https://www.googleapis.com/auth/drive",
+      callback: resp => this.onToken(resp),
+      error_callback: err => this.onToken({ error: err.type || "popup_closed" }),
+    });
+    return this.client;
+  },
+  /* Kullanıcı tıklamasıyla çağrılmalı (açılır pencere). */
+  signIn() {
+    return new Promise((resolve, reject) => {
+      this.waiters.push({ resolve, reject });
+      try { this.ensureClient().requestAccessToken({ prompt: this.email ? "" : "consent", login_hint: this.email || undefined }); }
+      catch (e) { this.waiters = []; reject(e); }
+    });
+  },
+  async onToken(resp) {
+    const ws = this.waiters; this.waiters = [];
+    if (resp.error) { ws.forEach(w => w.reject(new Error(resp.error === "popup_closed" ? "Google girişi kapatıldı" : "Google girişi başarısız: " + resp.error))); return; }
+    if (!google.accounts.oauth2.hasGrantedAllScopes(resp, "https://www.googleapis.com/auth/drive")) {
+      ws.forEach(w => w.reject(new Error("Drive izni verilmedi. Girişte Drive erişimi kutusunu işaretle."))); return;
+    }
+    this.token = resp.access_token; this.exp = Date.now() + (resp.expires_in || 3600) * 1000;
+    try {
+      const r = await fetch("https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)", { headers: { Authorization: "Bearer " + this.token } });
+      const j = await r.json(); this.email = j.user && j.user.emailAddress || this.email || "Google hesabı";
+    } catch {}
+    store.set("g_auth", { token: this.token, exp: this.exp, email: this.email });
+    ws.forEach(w => w.resolve());
+    renderAccounts();
+  },
+  signOut() {
+    if (this.token && window.google && google.accounts) google.accounts.oauth2.revoke(this.token, () => {});
+    this.token = null; this.exp = 0; this.email = null; store.set("g_auth", null); renderAccounts();
+  },
+  /* Süre dolduysa: aktarım sırasında kullanıcıdan yeniden giriş ister. */
+  async getToken() {
+    if (this.valid()) return this.token;
+    if (job && job.running) {
+      $("reauth").classList.remove("hidden");
+      setPhaseNote("Google girişi bekleniyor");
+      await new Promise((resolve, reject) => { reauthWaiter = { resolve, reject }; });
+      return this.token;
+    }
+    throw new Error("Google oturumu sona erdi. Yukarıdan Google'a yeniden bağlan.");
+  },
+};
+let reauthWaiter = null;
+$("reauthBtn").onclick = async () => {
+  try { await google_.signIn(); $("reauth").classList.add("hidden"); setPhaseNote(null); const w = reauthWaiter; reauthWaiter = null; w && w.resolve(); }
+  catch (e) { toast(e.message); }
+};
+
+/* ===== Dropbox oturumu (PKCE) ===== */
+const dbx = {
+  access: null, refresh: null, exp: 0, email: null,
+  init() { const s = store.get("d_auth"); if (s) Object.assign(this, s); },
+  save() { store.set("d_auth", { access: this.access, refresh: this.refresh, exp: this.exp, email: this.email }); },
+  connected() { return !!this.refresh; },
+  async signIn() {
+    const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+    const challenge = b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
+    const state = b64url(crypto.getRandomValues(new Uint8Array(16)));
+    sessionStorage.setItem("d_pkce", JSON.stringify({ verifier, state }));
+    const p = new URLSearchParams({ client_id: CONFIG.DROPBOX_APP_KEY, response_type: "code", code_challenge: challenge, code_challenge_method: "S256", redirect_uri: REDIRECT_URI, token_access_type: "offline", state });
+    location.href = "https://www.dropbox.com/oauth2/authorize?" + p;
+  },
+  async handleRedirect() {
+    const q = new URLSearchParams(location.search);
+    if (!q.has("code") && !q.has("error")) return;
+    history.replaceState(null, "", REDIRECT_URI);
+    if (q.has("error")) { toast("Dropbox girişi iptal edildi"); return; }
+    const saved = JSON.parse(sessionStorage.getItem("d_pkce") || "null"); sessionStorage.removeItem("d_pkce");
+    if (!saved || saved.state !== q.get("state")) { toast("Dropbox girişi doğrulanamadı, tekrar dene."); return; }
+    const r = await fetch("https://api.dropboxapi.com/oauth2/token", { method: "POST", body: new URLSearchParams({ code: q.get("code"), grant_type: "authorization_code", client_id: CONFIG.DROPBOX_APP_KEY, redirect_uri: REDIRECT_URI, code_verifier: saved.verifier }) });
+    const j = await r.json();
+    if (!r.ok) { toast("Dropbox girişi başarısız: " + (j.error_description || j.error || r.status)); return; }
+    this.access = j.access_token; this.refresh = j.refresh_token; this.exp = Date.now() + j.expires_in * 1000;
+    try { const a = await this.rpc("users/get_current_account", null); this.email = a.email; } catch { this.email = "Dropbox hesabı"; }
+    this.save(); toast("Dropbox bağlandı");
+  },
+  async getToken(force) {
+    if (!force && this.access && this.exp > Date.now() + 60000) return this.access;
+    const r = await fetchRetry("https://api.dropboxapi.com/oauth2/token", { method: "POST", body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: this.refresh, client_id: CONFIG.DROPBOX_APP_KEY }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { if (r.status === 400 || r.status === 401) { this.signOut(); } throw new Error("Dropbox oturumu sona erdi. Dropbox'a yeniden bağlan."); }
+    this.access = j.access_token; this.exp = Date.now() + j.expires_in * 1000; this.save();
+    return this.access;
+  },
+  async call(host, path, { arg, body, rangeHeader, json } = {}) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const headers = { Authorization: "Bearer " + await this.getToken(attempt > 0) };
+      if (json !== undefined) { headers["Content-Type"] = "application/json"; }
+      if (arg !== undefined) headers["Dropbox-API-Arg"] = asciiJson(arg);
+      if (body !== undefined && json === undefined) headers["Content-Type"] = "application/octet-stream";
+      if (rangeHeader) headers.Range = rangeHeader;
+      const r = await fetchRetry(`https://${host}.dropboxapi.com/2/${path}`, { method: "POST", headers, body: json !== undefined ? (json === null ? "null" : JSON.stringify(json)) : body });
+      if (r.status === 401 && attempt === 0) continue;
+      if (!r.ok) {
+        const t = await r.text(); let msg = t;
+        try { const e = JSON.parse(t); msg = e.error_summary || e.error_description || t; } catch {}
+        const err = new Error("Dropbox hatası " + r.status + ": " + String(msg).slice(0, 200)); err.status = r.status; err.summary = msg; throw err;
+      }
+      return r;
+    }
+  },
+  async rpc(path, json) { const r = await this.call("api", path, { json }); const t = await r.text(); return t ? JSON.parse(t) : {}; },
+  async signOut() {
+    const tok = this.access;
+    this.access = this.refresh = this.email = null; this.exp = 0; store.set("d_auth", null); renderAccounts();
+    if (tok) fetch("https://api.dropboxapi.com/2/auth/token/revoke", { method: "POST", headers: { Authorization: "Bearer " + tok } }).catch(() => {});
+  },
+};
+function b64url(bytes) { return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+/* Dropbox-API-Arg başlığı ASCII olmalı: Türkçe karakterleri \uXXXX olarak kodla. */
+function asciiJson(o) { return JSON.stringify(o).replace(/[\u007f-￿]/g, c => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0")); }
+
+/* ===== Depolar ===== */
+const Drive = {
+  key: "drive", name: "Google Drive", rootId: "root", rootLabel: "Drive'ım",
+  async req(url, opts = {}) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const tok = await google_.getToken();
+      const r = await fetchRetry(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: "Bearer " + tok } });
+      if (r.status === 401 && attempt === 0) { google_.exp = 0; continue; }
+      if (!r.ok && r.status !== 308) {
+        const t = await r.text(); let msg = t;
+        try { msg = JSON.parse(t).error.message; } catch {}
+        const err = new Error("Drive hatası " + r.status + ": " + String(msg).slice(0, 200)); err.status = r.status; throw err;
+      }
+      return r;
+    }
+  },
+  async list(folderId) {
+    const items = []; let pageToken = null;
+    do {
+      const p = new URLSearchParams({ q: `'${folderId}' in parents and trashed=false`, fields: "nextPageToken,files(id,name,mimeType,size)", pageSize: "1000", orderBy: "folder,name" });
+      if (pageToken) p.set("pageToken", pageToken);
+      const j = await (await this.req("https://www.googleapis.com/drive/v3/files?" + p)).json();
+      for (const f of j.files || []) items.push({ id: f.id, name: f.name, isFolder: f.mimeType === FOLDER_MIME, size: Number(f.size || 0), mime: f.mimeType });
+      pageToken = j.nextPageToken;
+    } while (pageToken);
+    return items;
+  },
+  /* Kaynak okuyucu: {name, size, read(start,end)} */
+  async opener(item) {
+    if (item.mime && item.mime.startsWith("application/vnd.google-apps.")) {
+      const ex = EXPORTS[item.mime];
+      if (!ex) throw new SkipError("Bu Google dosya türü dışa aktarılamıyor (" + item.mime.split(".").pop() + ")");
+      const r = await this.req(`https://www.googleapis.com/drive/v3/files/${item.id}/export?mimeType=${encodeURIComponent(ex[0])}`);
+      const blob = await r.blob();
+      const name = item.name.toLowerCase().endsWith(ex[1]) ? item.name : item.name + ex[1];
+      return { name, size: blob.size, read: (s, e) => Promise.resolve(blob.slice(s, e)) };
+    }
+    return {
+      name: item.name, size: item.size,
+      read: async (s, e) => (await this.req(`https://www.googleapis.com/drive/v3/files/${item.id}?alt=media`, { headers: { Range: `bytes=${s}-${e - 1}` } })).blob(),
+    };
+  },
+  async upload(parentId, src, onChunk) {
+    const meta = JSON.stringify({ name: src.name, parents: [parentId] });
+    const start = await this.req("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable", {
+      method: "POST", headers: { "Content-Type": "application/json; charset=UTF-8", "X-Upload-Content-Length": String(src.size) }, body: meta,
+    });
+    const loc = start.headers.get("Location");
+    if (!loc) throw new Error("Drive yükleme adresi alınamadı");
+    if (src.size === 0) { await this.req(loc, { method: "PUT", body: new Blob([]) }); return; }
+    for (let off = 0; off < src.size; off += CHUNK) {
+      const end = Math.min(off + CHUNK, src.size);
+      const data = await src.read(off, end);
+      if (data.size !== end - off) throw new Error("Kaynaktan eksik veri geldi");
+      onChunk("down", data.size);
+      await this.req(loc, { method: "PUT", headers: { "Content-Range": `bytes ${off}-${end - 1}/${src.size}` }, body: data });
+      onChunk("up", data.size);
+    }
+  },
+  async createFolder(parentId, name) {
+    const escd = name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const p = new URLSearchParams({ q: `'${parentId}' in parents and name='${escd}' and mimeType='${FOLDER_MIME}' and trashed=false`, fields: "files(id)" });
+    const ex = await (await this.req("https://www.googleapis.com/drive/v3/files?" + p)).json();
+    if (ex.files && ex.files.length) return ex.files[0].id;
+    const r = await this.req("https://www.googleapis.com/drive/v3/files?fields=id", { method: "POST", headers: { "Content-Type": "application/json; charset=UTF-8" }, body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }) });
+    return (await r.json()).id;
+  },
+};
+
+const Dropbox = {
+  key: "dropbox", name: "Dropbox", rootId: "", rootLabel: "Dropbox",
+  async list(path) {
+    const items = [];
+    let j = await dbx.rpc("files/list_folder", { path, limit: 2000 });
+    for (;;) {
+      for (const m of j.entries) {
+        if (m[".tag"] === "folder") items.push({ id: m.path_display, name: m.name, isFolder: true, size: 0 });
+        else if (m[".tag"] === "file") items.push({ id: m.path_display, name: m.name, isFolder: false, size: m.size });
+      }
+      if (!j.has_more) break;
+      j = await dbx.rpc("files/list_folder/continue", { cursor: j.cursor });
+    }
+    items.sort((a, b) => (b.isFolder - a.isFolder) || a.name.localeCompare(b.name, "tr"));
+    return items;
+  },
+  async opener(item) {
+    let whole = null;
+    return {
+      name: item.name, size: item.size,
+      read: async (s, e) => {
+        if (whole) return whole.slice(s, e);
+        const r = await dbx.call("content", "files/download", { arg: { path: item.id }, rangeHeader: `bytes=${s}-${e - 1}` });
+        const b = await r.blob();
+        if (r.status === 200 && b.size === item.size && (s > 0 || e < item.size)) { whole = b; return b.slice(s, e); }
+        return b;
+      },
+    };
+  },
+  childPath(parent, name) { return (parent && parent !== "/" ? parent.replace(/\/$/, "") : "") + "/" + name; },
+  async upload(parentId, src, onChunk) {
+    const path = this.childPath(parentId, src.name);
+    const commit = { path, mode: "add", autorename: true, mute: true };
+    if (src.size <= CHUNK) {
+      const data = await src.read(0, src.size); onChunk("down", data.size);
+      await dbx.call("content", "files/upload", { arg: commit, body: data }); onChunk("up", data.size);
+      return;
+    }
+    let off = 0, sid = null;
+    while (off < src.size) {
+      const end = Math.min(off + CHUNK, src.size);
+      const data = await src.read(off, end);
+      if (data.size !== end - off) throw new Error("Kaynaktan eksik veri geldi");
+      onChunk("down", data.size);
+      if (sid === null) {
+        const r = await dbx.call("content", "files/upload_session/start", { arg: { close: false }, body: data });
+        sid = (await r.json()).session_id;
+      } else if (end < src.size) {
+        await dbx.call("content", "files/upload_session/append_v2", { arg: { cursor: { session_id: sid, offset: off }, close: false }, body: data });
+      } else {
+        await dbx.call("content", "files/upload_session/finish", { arg: { cursor: { session_id: sid, offset: off }, commit }, body: data });
+      }
+      onChunk("up", data.size);
+      off = end;
+    }
+  },
+  async createFolder(parentId, name) {
+    const path = this.childPath(parentId, name);
+    try { const j = await dbx.rpc("files/create_folder_v2", { path, autorename: false }); return j.metadata.path_display || path; }
+    catch (e) { if (e.status === 409 && String(e.summary).includes("conflict")) return path; throw e; }
+  },
+};
+const SIDES = { drive: Drive, dropbox: Dropbox };
+
+/* ===== Durum ===== */
+const state = {
+  source: store.get("source") || "drive",
+  selected: new Map(), // id -> item
+  dest: null, // {id, label}
+};
+const srcStore = () => SIDES[state.source];
+const dstStore = () => SIDES[state.source === "drive" ? "dropbox" : "drive"];
+const isConnected = k => k === "drive" ? google_.valid() : dbx.connected();
+
+function renderAccounts() {
+  const gOk = google_.valid(), dOk = dbx.connected();
+  $("gSub").textContent = gOk ? google_.email : (!google_.configured() ? "Kurulum bekleniyor" : google_.email ? "Oturum süresi doldu" : "Bağlı değil");
+  $("gSub").className = "sub" + (gOk ? " ok" : "");
+  $("gBtn").textContent = gOk ? "Çıkış" : "Bağlan"; $("gBtn").className = gOk ? "btn ghost" : "btn";
+  $("gBtn").disabled = !google_.configured();
+  $("dSub").textContent = dOk ? dbx.email : "Bağlı değil";
+  $("dSub").className = "sub" + (dOk ? " ok" : "");
+  $("dBtn").textContent = dOk ? "Çıkış" : "Bağlan"; $("dBtn").className = dOk ? "btn ghost" : "btn";
+  renderSetup();
+}
+function renderSetup() {
+  const s = srcStore(), d = dstStore();
+  $("srcIc").innerHTML = ICONS[s.key]; $("srcName").textContent = s.name;
+  $("dstIc").innerHTML = ICONS[d.key]; $("dstName").textContent = d.name;
+  const n = state.selected.size;
+  const names = [...state.selected.values()].map(i => i.name);
+  $("srcSel").textContent = n ? `${n} öğe: ${names.slice(0, 3).join(", ")}${n > 3 ? "…" : ""}` : "Henüz seçilmedi";
+  $("n1").className = "num" + (n ? " done" : ""); $("n1").innerHTML = n ? ICONS.check : "1";
+  $("dstSel").textContent = state.dest ? state.dest.label : d.rootLabel + " (ana klasör)";
+  $("n2").className = "num" + (state.dest ? " done" : ""); $("n2").innerHTML = state.dest ? ICONS.check : "2";
+  const both = isConnected("drive") && isConnected("dropbox");
+  $("start").disabled = !(both && n);
+  $("hint").textContent = !google_.configured() ? "Google Drive bağlantısı için kurulum adımı tamamlanmadı."
+    : !both ? "Başlamak için iki hesabı da bağla." : !n ? "Kopyalanacak dosya veya klasörleri seç." : "Hazır. Klasörler alt klasörleriyle birlikte kopyalanır.";
+}
+
+$("gBtn").onclick = async () => {
+  if (google_.valid()) { google_.signOut(); return; }
+  try { await google_.signIn(); toast("Google Drive bağlandı"); } catch (e) { toast(e.message); }
+};
+$("dBtn").onclick = () => dbx.connected() ? dbx.signOut() : dbx.signIn();
+$("swap").onclick = () => {
+  state.source = state.source === "drive" ? "dropbox" : "drive"; store.set("source", state.source);
+  state.selected.clear(); state.dest = null; renderSetup();
+};
+$("pickSrc").onclick = () => { if (!isConnected(srcStore().key)) return toast(srcStore().name + " hesabını bağla."); openBrowser("source"); };
+$("pickDst").onclick = () => { if (!isConnected(dstStore().key)) return toast(dstStore().name + " hesabını bağla."); openBrowser("dest"); };
+
+/* ===== Gezgin ===== */
+const nav = { mode: null, store: null, stack: [], items: [], seq: 0 };
+function openBrowser(mode) {
+  nav.mode = mode; nav.store = mode === "source" ? srcStore() : dstStore();
+  nav.stack = [{ id: nav.store.rootId, name: nav.store.rootLabel }];
+  $("mTitle").textContent = mode === "source" ? nav.store.name + ": kopyalanacakları seç" : nav.store.name + ": hedef klasör";
+  $("mAll").classList.toggle("hidden", mode !== "source");
+  $("modal").classList.remove("hidden");
+  loadFolder();
+}
+function closeBrowser() { $("modal").classList.add("hidden"); renderSetup(); }
+async function loadFolder() {
+  const seq = ++nav.seq; const cur = nav.stack[nav.stack.length - 1];
+  renderCrumbs(); updateFooter();
+  $("list").innerHTML = '<div class="loading"><div class="spin"></div>Yükleniyor…</div>';
+  try {
+    let items = await nav.store.list(cur.id);
+    if (seq !== nav.seq) return;
+    if (nav.mode === "dest") items = items.filter(i => i.isFolder);
+    nav.items = items; renderList();
+  } catch (e) {
+    if (seq !== nav.seq) return;
+    $("list").innerHTML = `<div class="empty">Klasör açılamadı.<br><small>${esc(e.message)}</small></div>`;
+  }
+}
+function fileIcon(it) {
+  if (it.isFolder) return `<div class="fi" style="background:#FEF7E0">${ICONS.folder}</div>`;
+  if (it.mime && EXPORTS[it.mime]) return `<div class="fi" style="background:#E8F0FE;color:#1A73E8">${ICONS.file}</div>`;
+  for (const [re, bg, fg] of FILE_COLORS) if (re.test(it.name)) return `<div class="fi" style="background:${bg};color:${fg}">${ICONS.file}</div>`;
+  return `<div class="fi" style="background:var(--hover);color:var(--muted)">${ICONS.file}</div>`;
+}
+function renderList() {
+  if (!nav.items.length) { $("list").innerHTML = `<div class="empty">${nav.mode === "dest" ? "Bu klasörde alt klasör yok." : "Bu klasör boş."}</div>`; return; }
+  const src = nav.mode === "source";
+  $("list").innerHTML = nav.items.map((it, i) => {
+    const sel = src && state.selected.has(it.id);
+    const sub = it.isFolder ? "Klasör" : it.mime && EXPORTS[it.mime] ? "Google dosyası → " + EXPORTS[it.mime][1] : it.mime && it.mime.startsWith("application/vnd.google-apps.") ? "Aktarılamaz" : fmtSize(it.size);
+    return `<div class="row${sel ? " sel" : ""}" data-i="${i}">
+      ${src ? `<span class="cb">${sel ? ICONS.check : ""}</span>` : ""}
+      ${fileIcon(it)}
+      <div class="nm"><div>${esc(it.name)}</div><small>${sub}</small></div>
+      ${it.isFolder ? `<button class="open" data-open="${i}" title="Klasörü aç">${ICONS.chev}</button>` : ""}
+    </div>`;
+  }).join("");
+}
+$("list").onclick = e => {
+  const ob = e.target.closest("[data-open]");
+  if (ob) { const it = nav.items[ob.dataset.open]; nav.stack.push({ id: it.id, name: it.name }); loadFolder(); return; }
+  const row = e.target.closest(".row"); if (!row) return;
+  const it = nav.items[row.dataset.i];
+  if (nav.mode === "dest") { nav.stack.push({ id: it.id, name: it.name }); loadFolder(); return; }
+  if (state.selected.has(it.id)) state.selected.delete(it.id); else state.selected.set(it.id, it);
+  renderList(); updateFooter();
+};
+function renderCrumbs() {
+  $("crumbs").innerHTML = nav.stack.map((c, i) => `<button data-c="${i}">${esc(c.name)}</button>`).join("");
+  $("crumbs").scrollLeft = 1e6;
+}
+$("crumbs").onclick = e => { const b = e.target.closest("[data-c]"); if (!b) return; nav.stack.length = Number(b.dataset.c) + 1; loadFolder(); };
+$("mBack").onclick = () => { if (nav.stack.length > 1) { nav.stack.pop(); loadFolder(); } else closeBrowser(); };
+$("mClose").onclick = closeBrowser;
+$("mAll").onclick = () => {
+  const all = nav.items.length && nav.items.every(i => state.selected.has(i.id));
+  nav.items.forEach(i => all ? state.selected.delete(i.id) : state.selected.set(i.id, i));
+  renderList(); updateFooter();
+};
+function updateFooter() {
+  if (nav.mode === "source") {
+    const n = state.selected.size;
+    $("mInfo").textContent = n ? `${n} öğe seçildi` : "Dosya veya klasörlere dokunarak seç";
+    $("mOk").textContent = "Devam"; $("mOk").disabled = !n;
+  } else {
+    $("mInfo").textContent = "Hedef: " + nav.stack.map(c => c.name).join(" / ");
+    $("mOk").textContent = "Bu klasörü seç"; $("mOk").disabled = false;
+  }
+}
+$("mOk").onclick = () => {
+  if (nav.mode === "source") {
+    closeBrowser();
+    if (!state.dest && isConnected(dstStore().key)) openBrowser("dest");
+    return;
+  }
+  const cur = nav.stack[nav.stack.length - 1];
+  state.dest = { id: cur.id, label: nav.stack.map(c => c.name).join(" / ") };
+  closeBrowser();
+};
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("modal").classList.contains("hidden")) closeBrowser(); });
+
+/* ===== Aktarım ===== */
+let job = null;
+function setPhaseNote(t) { if (job) { job.note = t; paint(true); } }
+function logLine(cls, text) {
+  const l = $("log"); l.classList.remove("hidden");
+  const d = document.createElement("div"); d.className = cls; d.textContent = text; l.appendChild(d);
+}
+let lastPaint = 0;
+function paint(force) {
+  const now = performance.now(); if (!force && now - lastPaint < 200) return; lastPaint = now;
+  const j = job; if (!j) return;
+  const pct = j.bytesTotal > 0 ? Math.min(1, j.bytesDone / j.bytesTotal) : (j.filesTotal ? j.filesDone / j.filesTotal : 0);
+  const shown = j.finished && !j.cancelled ? 1 : pct;
+  $("ringArc").setAttribute("stroke-dashoffset", String(351.86 * (1 - shown)));
+  $("pct").textContent = Math.floor(shown * 100) + "%";
+  $("phase").textContent = j.note || j.phase;
+  $("curFile").textContent = j.current || " ";
+  $("fileBar").style.width = (j.fileSize ? Math.min(100, j.fileDone / j.fileSize * 100) : 0) + "%";
+  $("sFiles").textContent = `${j.filesDone} / ${j.filesTotal}`;
+  $("sBytes").textContent = `${fmtSize(j.bytesDone)} / ${fmtSize(j.bytesTotal)}`;
+  const win = j.samples.length > 1 ? j.samples[j.samples.length - 1] : null;
+  let speed = 0;
+  if (win) { const a = j.samples[0]; speed = (win.b - a.b) / Math.max(0.001, (win.t - a.t) / 1000); }
+  $("sSpeed").textContent = j.running && speed > 0 ? fmtSize(speed) + "/sn" : "–";
+  $("sEta").textContent = j.running && speed > 0 && j.bytesTotal ? fmtTime((j.bytesTotal - j.bytesDone) / speed) : j.finished ? "Bitti" : "–";
+}
+function sample() {
+  const now = performance.now(); job.samples.push({ t: now, b: job.bytesDone });
+  while (job.samples.length > 2 && now - job.samples[0].t > 8000) job.samples.shift();
+}
+
+$("start").onclick = async () => {
+  // Google oturumu yakında dolacaksa şimdi (tıklama anında) yenile.
+  if (!google_.exp || google_.exp < Date.now() + 15 * 60 * 1000) {
+    try { await google_.signIn(); } catch (e) { toast(e.message); return; }
+  }
+  runTransfer();
+};
+$("cancel").onclick = () => {
+  if (!job || !job.running) return;
+  job.cancelled = true; job.phase = "İptal ediliyor…"; paint(true);
+  if (reauthWaiter) { const w = reauthWaiter; reauthWaiter = null; w.reject(new CancelError("İptal edildi")); }
+};
+$("done").onclick = () => {
+  job = null; state.selected.clear(); state.dest = null;
+  $("progress").classList.add("hidden"); $("setup").classList.remove("hidden");
+  renderAccounts();
+};
+window.addEventListener("beforeunload", e => { if (job && job.running) { e.preventDefault(); e.returnValue = ""; } });
+
+async function runTransfer() {
+  const source = srcStore(), dest = dstStore();
+  const items = [...state.selected.values()];
+  const destRoot = state.dest ? state.dest.id : dest.rootId;
+  job = { running: true, finished: false, cancelled: false, phase: "Dosyalar taranıyor…", note: null, current: "", fileDone: 0, fileSize: 0,
+    filesDone: 0, filesTotal: 0, bytesDone: 0, bytesTotal: 0, samples: [], errors: 0, skipped: 0 };
+  $("setup").classList.add("hidden"); $("progress").classList.remove("hidden");
+  $("log").innerHTML = ""; $("log").classList.add("hidden"); $("reauth").classList.add("hidden");
+  $("cancel").classList.remove("hidden"); $("done").classList.add("hidden");
+  $("pTitle").textContent = `${source.name} → ${dest.name}`;
+  paint(true);
+  const tick = setInterval(() => { if (job && job.running) { sample(); paint(true); } }, 1000);
+  const err = msg => { job.errors++; logLine("e", "✕ " + msg); };
+
+  try {
+    // 1) Tara
+    const entries = [], folders = [];
+    async function scan(item, dir) {
+      if (job.cancelled) throw new CancelError();
+      if (item.isFolder) {
+        const path = [...dir, item.name]; folders.push(path);
+        job.phase = "Taranıyor: " + path.join("/"); job.filesTotal = entries.length; paint();
+        let kids;
+        try { kids = await source.list(item.id); }
+        catch (e) { if (e instanceof CancelError) throw e; err(path.join("/") + ": klasör okunamadı (" + e.message + ")"); return; }
+        for (const c of kids) await scan(c, path);
+      } else entries.push({ item, dir });
+    }
+    for (const it of items) await scan(it, []);
+    job.filesTotal = entries.length;
+    job.bytesTotal = entries.reduce((s, e) => s + (e.item.size || 0), 0);
+    job.phase = "Aktarılıyor"; paint(true);
+
+    // 2) Klasör yapısı
+    const ids = new Map([["", destRoot]]);
+    async function ensure(path) {
+      const k = path.join("\u0000"); if (ids.has(k)) return ids.get(k);
+      const parent = await ensure(path.slice(0, -1));
+      const id = await dest.createFolder(parent, path[path.length - 1]);
+      ids.set(k, id); return id;
+    }
+    for (const f of folders) {
+      try { await ensure(f); } catch (e) { if (e instanceof CancelError) throw e; err(f.join("/") + ": klasör oluşturulamadı (" + e.message + ")"); }
+    }
+
+    // 3) Dosyalar
+    for (const { item, dir } of entries) {
+      if (job.cancelled) throw new CancelError();
+      const shown = [...dir, item.name].join("/");
+      const before = job.bytesDone, expected = item.size || 0;
+      job.current = shown; job.fileDone = 0; job.fileSize = expected; job.phase = "Aktarılıyor"; paint(true);
+      try {
+        const parentId = await ensure(dir);
+        const raw = await source.opener(item);
+        const src = { ...raw, read: (s, e) => s >= e ? Promise.resolve(new Blob([])) : raw.read(s, e) };
+        job.fileSize = src.size;
+        let moved = 0;
+        await dest.upload(parentId, src, (kind, n) => {
+          if (kind !== "up") { job.phase = "İndiriliyor"; paint(); return; }
+          moved += n; job.fileDone = moved; job.phase = "Yükleniyor";
+          job.bytesDone = before + (src.size ? Math.round(expected * moved / src.size) : 0); paint();
+        });
+      } catch (e) {
+        if (e instanceof CancelError) throw e;
+        if (e instanceof SkipError) { job.skipped++; logLine("s", "↷ " + shown + ": " + e.message); }
+        else err(shown + ": " + e.message);
+      }
+      job.filesDone++; job.bytesDone = before + expected; paint(true);
+    }
+    job.phase = job.errors ? `Tamamlandı (${job.errors} hata)` : "Tamamlandı";
+    job.bytesDone = job.bytesTotal; job.current = `${job.filesDone - job.errors - job.skipped} dosya kopyalandı` + (job.skipped ? `, ${job.skipped} atlandı` : "");
+  } catch (e) {
+    if (e instanceof CancelError || job.cancelled) { job.cancelled = true; job.phase = "İptal edildi"; }
+    else { err("Aktarım durdu: " + e.message); job.phase = "Hata ile durdu"; }
+  } finally {
+    clearInterval(tick);
+    job.running = false; job.finished = true; job.note = null; job.fileDone = job.fileSize;
+    $("reauth").classList.add("hidden");
+    $("cancel").classList.add("hidden"); $("done").classList.remove("hidden");
+    paint(true);
+  }
+}
+
+/* ===== Başlangıç ===== */
+google_.init(); dbx.init();
+renderAccounts();
+dbx.handleRedirect().then(renderAccounts).catch(e => toast(e.message));
+</script>
+</body>
+</html>
